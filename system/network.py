@@ -23,3 +23,4 @@ class Networkwatchdog:
         "downspeed": downspeed,
         "upspeed": upspeed
     }
+#####

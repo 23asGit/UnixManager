@@ -28,4 +28,23 @@ def speedformat(bytessecond):
         return f"{bytessecond/kb:.2f} KB/s"
     else:
         return f"{bytessecond:.2f} Bytes/s"
+
+#####
+#the progress bar
+#####
+
+def progressbar(percent, width=20):
+    percent=max(0.0, min(percent, 100.0))
+    fill= round(width * percent / 100)
+    bar = "█" * fill + "░" * (width - fill)
+
+    if percent < 60:
+        color = "\033[32m" #aka green
+    elif percent < 85:
+        color= "\033[33m" #aka yellow
+    else:
+        color="\033[31m" #aka red
+
+    return f"{color}{bar}\033[0m" 
+
     
