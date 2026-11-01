@@ -14,7 +14,7 @@ def bytesformat(bytes_num):
     elif bytes_num >= kb:
         return f"{bytes_num/kb:.2f} KB"
     else:
-        return f"{bytes_num} Bytes"
+        return f"{bytes_num:.2f} Bytes"
 
 #####
 #the mb/s function for network speed
@@ -27,5 +27,5 @@ def speedformat(bytessecond):
     elif bytessecond >= kb:
         return f"{bytessecond/kb:.2f} KB/s"
     else:
-        return f"{bytessecond} Bytes/s"
+        return f"{bytessecond:.2f} Bytes/s"
     
