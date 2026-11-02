@@ -20,6 +20,7 @@ from contextlib import redirect_stdout, contextmanager
 
 ### 
 REFRESH_SECONDS = 1
+MESSAGE_SECONDS = 4
 ###
 
 #pyfiglet and rich console setup
@@ -35,14 +36,14 @@ def banner():
     elif columns >= 76:
         font = "small"
     else:
-        console.print("[bold red]TaskUnixManager[/bold red]")
+        console.print("[bold red]UnixManager[/bold red]")
         return
         
-    title = Figlet(font=font, width=200).renderText("TaskUnixManager")
+    title = Figlet(font=font, width=200).renderText("UnixManager")
 
     console.print(Panel(
         title,
-        title="TaskUnixManager",
+        title="UnixManager",
         border_style="red"
     ))
 
@@ -211,8 +212,8 @@ def drawframe(frame_lines, scroll, sort_by, expand, show_cores, prompt ):
     else:
         showen_end = scroll + len(view)
         footer = (
-        f" ↑↓ / scroll | m RAM | c CPU | e expand:{'on' if expand else 'off'}"
-        f"|t cores:{'on' if show_cores else 'off'} | '/' find | i info | q quit | [{scroll + 1}-{showen_end} / {len(frame_lines)}]"
+        f" ↑↓ / scroll | m RAM/c CPU | e expand:{'on' if expand else 'off'}"
+        f"|t cores:{'on' if show_cores else 'off'} | '/' find | i info |k kill| q quit | [{scroll + 1}-{showen_end} / {len(frame_lines)}]"
         )
     footer = footer[:size.columns]
     
@@ -266,10 +267,9 @@ def terminal():
 
 
 #####
-#prompt for testing
+#prompt
 #####
 def editprompt(key, text):
-    """Returns (new_text, action). action is none, "submit" or "cancel" """
     if key in ("\r", "\n"):
         return text, "submit"
     if key == "\x1b":
@@ -299,6 +299,12 @@ def main():
     frame_lines = []
     next_refresh = 0.0
     running = True
+    target_pid = None
+    target_pids = []
+    targetlabel = ""
+    target_name = None
+    message = ""
+    message_until = 0.0
 
     try:
         with terminal():
@@ -315,11 +321,30 @@ def main():
                     prompt = f" Filter by name: {prompt_text}█    Enter = apply | Esc = cancel"
                 elif mode == "info":
                     prompt = f" Show details for PID: {prompt_text}█    Enter = open | Esc = cancel"
-                
+                elif mode == "kill":
+                    prompt = f" End PID / app name / tree PID: {prompt_text}█   Enter = next | Esc = cancel"
+                elif mode == "confirm":
+                    prompt =  f" End {targetlabel}?   y = terminate | f = force kill | other key = cancel"
+                elif message and time.monotonic() < message_until:
+                    prompt= f" {message}"
+
                 scroll = drawframe(frame_lines, scroll, sort_by, expand, show_cores, prompt)
 
                 page = max(shutil.get_terminal_size().lines - 2, 1)
                 for key in rkeys(next_refresh - time.monotonic()):
+####                 confirm mode
+                    if mode == "confirm":
+                        if key == "y":
+                            ok, message = process_manager.endtargets(target_pids)
+                        elif key == "f":
+                            ok, message = process_manager.endtargets(target_pids, force=True)
+                        else:
+                            message = "Cancelled."
+                        message_until = time.monotonic() + MESSAGE_SECONDS
+                        mode = "normal"
+                        next_refresh = 0.0
+                        continue
+
 ####                 typing mode
                     if mode != "normal":
                         prompt_text, action = editprompt(key, prompt_text)
@@ -327,12 +352,29 @@ def main():
                             mode = "normal"
                         elif action == "submit":
                             value = prompt_text.strip()
+                            next_mode = "normal"
+
                             if mode == "filter":
                                 namefilter = value
                                 scroll = 0
                             elif mode == "info":
                                 details_pid = int(value) if value.isdigit() else None
-                            mode = "normal"
+                                scroll= 0
+                            elif mode == "kill":
+                                plan = process_manager.plankill(value)
+                                if plan["ok"]:
+                                    target_pids = plan["pids"]
+                                    targetlabel = plan["label"]
+                                    next_mode = "confirm"
+
+                                else:
+                                    message= plan["reason"]
+                                    message_until= time.monotonic() + MESSAGE_SECONDS
+                            else:
+                                    message= "Entier a numeric PID"
+                                    message_until= time.monotonic() + MESSAGE_SECONDS
+
+                            mode = next_mode
                             next_refresh = 0.0 
                         continue
 
@@ -362,6 +404,9 @@ def main():
                         prompt_text = namefilter
                     elif key == "i":
                         mode = "info"
+                        prompt_text = ""
+                    elif key == "k":
+                        mode= "kill"
                         prompt_text = ""
                     elif key == "x":
                         details_pid = None
